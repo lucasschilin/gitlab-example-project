@@ -1,4 +1,6 @@
 deploy:
-	cp -r ./* /var/www/html/ && \
-	cp /var/www/html/nginx/default.conf /etc/nginx/sites-enabled/default && \
-	nginx -s reload
+	cd /var/www/html && \
+	git pull origin dev && \
+	cp nginx/default.conf /etc/nginx/sites-enabled/default && \
+	sudo nginx -t && \
+	sudo nginx -s reload
