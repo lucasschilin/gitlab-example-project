@@ -28,6 +28,15 @@
       # Adiciona o host remoto como confiável (evita prompt interativo)
       - ssh-keyscan $DEPLOY_HOST >> ~/.ssh/known_hosts
     script:
+      - |
+        if [ -n "$CI_COMMIT_TAG" ]; then
+          VERSION="$CI_COMMIT_TAG"   # Se for tag (beta/prod)
+        else
+          VERSION="$CI_COMMIT_BRANCH" # Se for branch (dev/homolog)
+        fi
+        echo "Versão detectada: $VERSION"
+        sed -i "s|{{VERSION}}|$VERSION|g" index.html
+
       # Sincroniza arquivos para o servidor remoto
       - rsync -av --exclude='.git' ./ deploy@$DEPLOY_HOST:/tmp/deploy
 
