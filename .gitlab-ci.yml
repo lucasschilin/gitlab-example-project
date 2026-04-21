@@ -1,34 +1,70 @@
-stages:
-  - deploy
+  stages:
+    - deploy
 
-deploy_dev:
-  stage: deploy
-  only:
-    - dev
+  #DEPLOY DEBUG
+  debug_pipeline:
+    stage: deploy
+    script:
+      - 'echo "Branch: $CI_COMMIT_BRANCH"'
+      - 'echo "Tag: $CI_COMMIT_TAG"'
 
-  before_script:
-    # instala ssh e rsync
-    - apt-get update -y
-    - apt-get install -y openssh-client rsync
+  # DEPLOY TEMPLATE
+  .deploy_template:
+    stage: deploy
+    before_script:
+      # Atualiza pacotes e instala dependências necessárias
+      - apt-get update -y
+      - apt-get install -y openssh-client rsync
 
-    # inicia ssh-agent
-    - eval $(ssh-agent -s)
+      # Inicia o agente SSH
+      - eval $(ssh-agent -s)
 
-    # adiciona chave privada
-    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+      # Adiciona a chave privada (vinda de variável de ambiente do GitLab)
+      - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
 
-    # prepara ssh
-    - mkdir -p ~/.ssh
+      # Cria diretório de configuração do SSH
+      - mkdir -p ~/.ssh
 
-    # adiciona o container server-dev como host confiável
-    - ssh-keyscan server-dev >> ~/.ssh/known_hosts
+      # Adiciona o host remoto como confiável (evita prompt interativo)
+      - ssh-keyscan $DEPLOY_HOST >> ~/.ssh/known_hosts
+    script:
+      # Sincroniza arquivos para o servidor remoto
+      - rsync -av --exclude='.git' ./ deploy@$DEPLOY_HOST:/tmp/deploy
 
-  script:
-    # copia arquivos para o container
-    - rsync -av --exclude='.git' ./ deploy@server-dev:/tmp/deploy
+      # Executa comando de deploy no servidor remoto
+      - ssh deploy@$DEPLOY_HOST "
+          cd /tmp/deploy &&
+          make deploy
+        "
 
-    # executa deploy
-    - ssh deploy@server-dev "
-        cd /tmp/deploy &&
-        make deploy
-      "
+  # DEPLOY DEV
+  deploy_dev:
+    extends: .deploy_template
+    only:
+      - dev
+    variables:
+      DEPLOY_HOST: server-dev
+
+  # DEPLOY HOMOLOG
+  deploy_homolog:
+    extends: .deploy_template
+    rules:
+      - if: '$CI_COMMIT_BRANCH =~ /^release\/v\d+\.\d+\.0$/'
+    variables:
+      DEPLOY_HOST: server-homolog
+
+  # DEPLOY BETA
+  deploy_beta:
+    extends: .deploy_template
+    rules:
+      - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.0-beta\d+$/'
+    variables:
+      DEPLOY_HOST: server-beta
+
+  # DEPLOY PROD
+  deploy_prod:
+    extends: .deploy_template
+    rules:
+      - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/'
+    variables:
+      DEPLOY_HOST: server-prod
