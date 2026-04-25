@@ -36,6 +36,14 @@
         fi
         echo "Versão detectada: $VERSION"
         sed -i "s|{{VERSION}}|$VERSION|g" index.html
+      - |
+        DEPLOY_DATETIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        echo "Data de deploy: $DEPLOY_DATETIME"
+        sed -i "s|{{DEPLOY_DATETIME}}|$DEPLOY_DATETIME|g" index.html
+      - |
+        DEPLOY_USER=$(git log -1 --pretty=format:'%an')
+        echo "Usuário de deploy: $DEPLOY_USER"
+        sed -i "s|{{DEPLOY_USER}}|$DEPLOY_USER|g" index.html
 
       # Sincroniza arquivos para o servidor remoto
       - rsync -av --exclude='.git' ./ deploy@$DEPLOY_HOST:/tmp/deploy
